@@ -126,7 +126,24 @@ export function TranscriptPanel() {
       }
 
       if (d.auto_queued) {
-        useQueueStore.getState().addItem({
+        const queue = useQueueStore.getState()
+        // For chapter-only detections, match by book+chapter (any verse) to
+        // avoid re-adding "Mark 1:1" when "Mark 1:2" already exists from a
+        // previous chapter-only → refinement cycle.
+        const dupIdx = d.is_chapter_only
+          ? queue.items.findIndex(
+              (i) =>
+                i.verse.book_number === d.book_number &&
+                i.verse.chapter === d.chapter,
+            )
+          : queue.findDuplicate(d.book_number, d.chapter, d.verse)
+        if (dupIdx !== -1) {
+          const existing = queue.items[dupIdx]
+          queue.flashItem(existing.id)
+          if (!d.is_chapter_only) queue.setActive(dupIdx)
+          continue
+        }
+        queue.addItem({
           id: crypto.randomUUID(),
           verse: {
             id: 0,
